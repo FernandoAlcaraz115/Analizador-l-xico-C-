@@ -12,6 +12,10 @@ namespace AnalizadorLexico.Model
         public string Message { get; set; }
         public string Suggestion { get; set; }
 
+        // Ubicación exacta en el código fuente (para resaltar el error en el editor)
+        public int Position { get; set; }
+        public int Length { get; set; }
+
         public LexicalError()
         {
             InvalidLexeme = string.Empty;

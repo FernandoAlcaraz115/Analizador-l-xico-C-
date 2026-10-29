@@ -16,7 +16,7 @@ El proyecto cuenta con **soporte dual**:
   - **Estructura y POO**: `class`, `function`, `public`, `private`, `static`, `new`, `main`.
   - **Entrada / Salida**: `print`, `println`, `read`.
   - **Constantes y Literales**: Enteros (`42`), Decimales (`3.1416`), Cadenas con escapes (`"texto\n"`), Caracteres (`'a'`), Booleanos (`true`, `false`) y Nulos (`null`).
-  - **Identificadores de Usuario**: Validados bajo la regla `[a-zA-Z_][a-zA-Z0-9_]*`.
+  - **Identificadores de Usuario**: Validados bajo la regla `[letra|_][letra|dígito|_]*` (acepta acentos y ñ, ej. `año`).
   - **Operadores Aritméticos**: `+`, `-`, `*`, `/`, `%`, `++`, `--`.
   - **Operadores Relacionales**: `==`, `!=`, `<`, `<=`, `>`, `>=`.
   - **Operadores Lógicos**: `&&`, `||`, `!`.
@@ -132,7 +132,7 @@ AnalizadorLexico.exe ejemplos\ejemplo_con_errores.txt
 
 | Componente | Expresión Regular / Regla | Ejemplo |
 | :--- | :--- | :--- |
-| **Identificadores** | `[a-zA-Z_][a-zA-Z0-9_]*` | `totalVenta`, `_contador`, `nodo1` |
+| **Identificadores** | `[letra|_][letra|dígito|_]*` | `totalVenta`, `_contador`, `año` |
 | **Enteros** | `[0-9]+` | `0`, `450`, `1001` |
 | **Decimales** | `[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?` | `3.14159`, `0.5`, `1.2e-3` |
 | **Cadenas** | `"([^"\n\\]|\\.)*"` | `"Hola Mundo"`, `"Salto\n"` |
@@ -140,3 +140,29 @@ AnalizadorLexico.exe ejemplos\ejemplo_con_errores.txt
 | **Operadores** | `+`, `-`, `*`, `/`, `%`, `++`, `--`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&&`, `||`, `!` | `x += 5;`, `a && b` |
 | **Delimitadores**| `(`, `)`, `{`, `}`, `[`, `]`, `;`, `,`, `:`, `.`, `->` | `(a, b);` |
 | **Comentarios** | `//[^\n]*` ó `/\*[\s\S]*?\*/` | `// nota`, `/* bloque */` |
+
+---
+
+## 📝 Historial de Cambios
+
+### Versión 1.1 — Correcciones y mejoras
+
+**Correcciones de errores**
+- **Números de línea desfasados:** después de una cadena sin cerrar, la línea se incrementaba dos veces y todos los tokens y errores siguientes se reportaban una línea más abajo. Ahora el salto de línea solo lo procesa `ScanToken()`.
+- **Comentario de bloque sin cerrar:** el error se reportaba en la última línea del archivo; ahora se reporta en la línea y columna donde inicia el `/*`. Los comentarios de bloque de varias líneas también se reportan en su línea de inicio.
+
+**Mejoras en el analizador (`Lexer.cs`)**
+- **Acentos y ñ en identificadores:** `año`, `posición` o `núm` ahora son identificadores válidos (antes se partían en varios tokens y errores).
+- **Validación de rangos:** una constante entera mayor a `2147483647` (máximo de `int`) o un decimal que excede el rango de `double` (ej. `1e999`) se reporta como error léxico.
+- **Decimales sin parte entera:** `.5`, `.25` y `.5e2` se reconocen como constantes decimales.
+- **Tipo en declaraciones múltiples:** en `int a, b, c;` las tres variables quedan registradas como `int` en la tabla de símbolos (antes solo la primera).
+- **Errores con el lexema completo:** las cadenas y caracteres mal formados muestran todo el texto inválido (ej. `'demasiado_largo'`) en lugar de solo la comilla.
+- **Emojis y símbolos Unicode:** se reportan como un solo error legible en lugar de dos caracteres inválidos.
+
+**Mejoras en la interfaz (`MainForm.cs`)**
+- **Resaltado de sintaxis en el editor:** después de analizar, cada token se colorea según su categoría y los errores léxicos se marcan con fondo rojo.
+- **Ubicar en el código:** al hacer clic en una fila de las pestañas *Tokens* o *Errores Léxicos*, se selecciona ese lexema en el editor.
+- **Sin ventana de consola detrás:** el programa se compila como aplicación de ventana (`/target:winexe`). El modo consola (`ejecutar_consola.bat`) sigue funcionando.
+
+**Cambios en el modelo**
+- `Token` y `LexicalError` ahora guardan su posición en el texto (`Position`, `Length`), necesaria para el resaltado.

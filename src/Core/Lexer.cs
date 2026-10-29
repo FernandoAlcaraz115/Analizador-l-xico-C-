@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using AnalizadorLexico.Model;
 
 namespace AnalizadorLexico.Core
@@ -26,6 +27,7 @@ namespace AnalizadorLexico.Core
         private int _tokenCounter;
         private int _errorCounter;
         private TokenType _lastTokenType;
+        private string _declarationType;   // tipo de la declaración en curso (para "int a, b, c;")
 
         public bool PreserveComments { get; set; }
         public LexerStats Stats { get; private set; }
@@ -120,6 +122,7 @@ namespace AnalizadorLexico.Core
             _tokenCounter = 1;
             _errorCounter = 1;
             _lastTokenType = TokenType.EndOfFile;
+            _declarationType = null;
 
             Stopwatch sw = Stopwatch.StartNew();
 
@@ -187,7 +190,10 @@ namespace AnalizadorLexico.Core
                     AddToken(TokenType.Colon, TokenCategory.Delimitador, "Dos puntos");
                     break;
                 case '.':
-                    AddToken(TokenType.Dot, TokenCategory.Delimitador, "Punto de acceso");
+                    if (IsDigit(Peek()))
+                        ScanNumber(true);   // decimal sin parte entera, ej. .5
+                    else
+                        AddToken(TokenType.Dot, TokenCategory.Delimitador, "Punto de acceso");
                     break;
 
                 // Operadores aritméticos y compuestos
@@ -323,7 +329,7 @@ namespace AnalizadorLexico.Core
                 default:
                     if (IsDigit(c))
                     {
-                        ScanNumber();
+                        ScanNumber(false);
                     }
                     else if (IsAlpha(c))
                     {
@@ -331,7 +337,12 @@ namespace AnalizadorLexico.Core
                     }
                     else
                     {
-                        AddError(c.ToString(), "Carácter inesperado o no reconocido por el analizador", 
+                        // Emojis y otros símbolos ocupan 2 "char" en C#: se reportan como uno solo
+                        if (char.IsHighSurrogate(c) && char.IsLowSurrogate(Peek()))
+                        {
+                            Advance();
+                        }
+                        AddError(_source.Substring(_start, _current - _start), "Carácter inesperado o no reconocido por el analizador", 
                             "Verifique si es un símbolo tipográfico accidental o reemplace por un operador válido.");
                     }
                     break;
@@ -367,6 +378,8 @@ namespace AnalizadorLexico.Core
                     if (PreserveComments)
                     {
                         AddToken(TokenType.CommentBlock, TokenCategory.Comentario, "Comentario de bloque");
+                        // Un comentario de varias líneas se reporta en la línea donde inicia
+                        _tokens[_tokens.Count - 1].Line = commentStartLine;
                     }
                     return;
                 }
@@ -381,8 +394,12 @@ namespace AnalizadorLexico.Core
             }
 
             // Si llegamos aquí, el comentario no se cerró
+            _line = commentStartLine;          // reportar el error donde inicia el comentario
+            _startColumn = commentStartCol;
+            _current = _start + 2;             // resaltar solo el "/*" en el editor
             AddError("/*", "Comentario de bloque sin cerrar", 
                 string.Format("El comentario iniciado en L:{0}, C:{1} no tiene cierre '*/' antes del fin de archivo.", commentStartLine, commentStartCol));
+            _current = _source.Length;
         }
 
         private void ScanString()
@@ -395,10 +412,8 @@ namespace AnalizadorLexico.Core
                 if (Peek() == '\n')
                 {
                     // Error: cadena multilínea no permitida sin escape
-                    AddError("\"", "Cadena no terminada antes del fin de línea", "Cierre las comillas dobles antes del salto de línea.");
-                    _line++;
-                    _column = 1;
-                    return;
+                    AddError(_source.Substring(_start, _current - _start), "Cadena no terminada antes del fin de línea", "Cierre las comillas dobles antes del salto de línea.");
+                    return; // el '\n' lo procesa ScanToken (ahí se incrementa la línea)
                 }
 
                 if (Peek() == '\\')
@@ -417,7 +432,7 @@ namespace AnalizadorLexico.Core
 
             if (IsAtEnd())
             {
-                AddError("\"", "Cadena sin comilla de cierre al final del archivo", 
+                AddError(_source.Substring(_start, _current - _start), "Cadena sin comilla de cierre al final del archivo", 
                     string.Format("La cadena abierta en L:{0}, C:{1} debe cerrarse con comillas dobles.", stringStartLine, stringStartCol));
                 return;
             }
@@ -460,7 +475,7 @@ namespace AnalizadorLexico.Core
 
                 if (Peek() == '\'') Advance();
 
-                AddError("'", "Literal de carácter mal formado o sin cerrar", 
+                AddError(_source.Substring(_start, _current - _start), "Literal de carácter mal formado o sin cerrar", 
                     "Use comillas simples para exactamente un carácter o comillas dobles para cadenas.");
                 return;
             }
@@ -470,9 +485,9 @@ namespace AnalizadorLexico.Core
             AddToken(TokenType.LitChar, TokenCategory.ConstanteCaracter, "Literal de Carácter (char)");
         }
 
-        private void ScanNumber()
+        private void ScanNumber(bool startsWithDot)
         {
-            bool isDecimal = false;
+            bool isDecimal = startsWithDot;
 
             while (IsDigit(Peek()))
             {
@@ -480,7 +495,7 @@ namespace AnalizadorLexico.Core
             }
 
             // Buscar parte decimal
-            if (Peek() == '.' && IsDigit(PeekNext()))
+            if (!startsWithDot && Peek() == '.' && IsDigit(PeekNext()))
             {
                 isDecimal = true;
                 Advance(); // Consumir el '.'
@@ -520,12 +535,30 @@ namespace AnalizadorLexico.Core
                 return;
             }
 
+            string number = _source.Substring(_start, _current - _start);
+
             if (isDecimal)
             {
+                double value;
+                bool ok = double.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+                if (!ok || double.IsInfinity(value))
+                {
+                    AddError(number, "Constante decimal fuera de rango",
+                        "El valor excede el máximo de un double (aprox. 1.7e308).");
+                    return;
+                }
                 AddToken(TokenType.LitFloat, TokenCategory.ConstanteDecimal, "Constante Numérica Decimal");
             }
             else
             {
+                long value;
+                bool ok = long.TryParse(number, NumberStyles.None, CultureInfo.InvariantCulture, out value);
+                if (!ok || value > int.MaxValue)
+                {
+                    AddError(number, "Constante entera fuera de rango",
+                        "El valor máximo de un entero (int) es 2147483647.");
+                    return;
+                }
                 AddToken(TokenType.LitInt, TokenCategory.ConstanteEntera, "Constante Numérica Entera");
             }
         }
@@ -571,6 +604,12 @@ namespace AnalizadorLexico.Core
 
         private string GetInferredTypeFromPreviousToken()
         {
+            // int a, b, c;  ->  b y c también son int
+            if (_lastTokenType == TokenType.Comma && _declarationType != null)
+            {
+                return _declarationType;
+            }
+
             switch (_lastTokenType)
             {
                 case TokenType.KwInt: return "int";
@@ -599,9 +638,32 @@ namespace AnalizadorLexico.Core
                 description
             );
 
+            token.Position = _start;
             _tokens.Add(token);
             Stats.IncrementCategory(category);
             _lastTokenType = type;
+            UpdateDeclarationType(type);
+        }
+
+        // Recuerda el tipo de la declaración actual hasta que termina (; ( ) { })
+        private void UpdateDeclarationType(TokenType type)
+        {
+            switch (type)
+            {
+                case TokenType.KwInt: _declarationType = "int"; break;
+                case TokenType.KwFloat: _declarationType = "float"; break;
+                case TokenType.KwDouble: _declarationType = "double"; break;
+                case TokenType.KwChar: _declarationType = "char"; break;
+                case TokenType.KwString: _declarationType = "string"; break;
+                case TokenType.KwBool: _declarationType = "bool"; break;
+                case TokenType.Semicolon:
+                case TokenType.OpenParen:
+                case TokenType.CloseParen:
+                case TokenType.OpenBrace:
+                case TokenType.CloseBrace:
+                    _declarationType = null;
+                    break;
+            }
         }
 
         private void AddError(string invalidLexeme, string message, string suggestion)
@@ -615,6 +677,8 @@ namespace AnalizadorLexico.Core
                 suggestion
             );
 
+            err.Position = _start;
+            err.Length = Math.Max(1, _current - _start);
             _errors.Add(err);
             Stats.IncrementCategory(TokenCategory.Error);
         }
@@ -662,7 +726,8 @@ namespace AnalizadorLexico.Core
         {
             return (c >= 'a' && c <= 'z') ||
                    (c >= 'A' && c <= 'Z') ||
-                   c == '_';
+                   c == '_' ||
+                   (c > 127 && char.IsLetter(c));   // letras con acento y ñ (año, posición)
         }
 
         private static bool IsAlphaNumeric(char c)

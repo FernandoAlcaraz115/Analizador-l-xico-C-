@@ -14,6 +14,9 @@ namespace AnalizadorLexico.Model
         public int Length { get; set; }
         public string Description { get; set; }
 
+        // Índice del primer carácter en el código fuente (para resaltarlo en el editor)
+        public int Position { get; set; }
+
         public Token()
         {
             Lexeme = string.Empty;

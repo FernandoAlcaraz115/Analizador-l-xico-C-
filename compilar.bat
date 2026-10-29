@@ -32,7 +32,7 @@ echo Usando compilador: %CSC_PATH%
 echo Compilando archivos de codigo fuente...
 echo.
 
-"%CSC_PATH%" /target:exe /optimize+ /nologo /r:System.Windows.Forms.dll,System.Drawing.dll,System.dll,System.Core.dll /out:AnalizadorLexico.exe src\Model\*.cs src\Core\*.cs src\UI\*.cs src\Program.cs
+"%CSC_PATH%" /target:winexe /optimize+ /nologo /r:System.Windows.Forms.dll,System.Drawing.dll,System.dll,System.Core.dll /out:AnalizadorLexico.exe src\Model\*.cs src\Core\*.cs src\UI\*.cs src\Program.cs
 
 if %errorlevel% equ 0 (
     echo.

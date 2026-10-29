@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using AnalizadorLexico.Core;
@@ -11,6 +12,12 @@ namespace AnalizadorLexico
 {
     static class Program
     {
+        // Permite que el .exe (compilado como aplicación de ventana) escriba en la terminal
+        // desde la que se ejecutó, cuando se usa en modo consola.
+        [DllImport("kernel32.dll")]
+        private static extern bool AttachConsole(int dwProcessId);
+        private const int ATTACH_PARENT_PROCESS = -1;
+
         [STAThread]
         static int Main(string[] args)
         {
@@ -24,6 +31,8 @@ namespace AnalizadorLexico
             }
 
             // Modo Consola
+            AttachConsole(ATTACH_PARENT_PROCESS);
+            Console.WriteLine();
             return RunConsoleMode(args);
         }
 

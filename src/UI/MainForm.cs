@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using AnalizadorLexico.Core;
@@ -243,6 +244,7 @@ namespace AnalizadorLexico.UI
             _tabTokens.BackColor = Theme.BgCard;
             _gridTokens = CreateStyledGrid();
             SetupTokensGrid();
+            _gridTokens.CellClick += delegate(object s, DataGridViewCellEventArgs e) { SelectFromGrid(_gridTokens, e.RowIndex); };
             _tabTokens.Controls.Add(_gridTokens);
 
             // Tab 2: Tabla de Símbolos
@@ -257,6 +259,7 @@ namespace AnalizadorLexico.UI
             _tabErrors.BackColor = Theme.BgCard;
             _gridErrors = CreateStyledGrid();
             SetupErrorsGrid();
+            _gridErrors.CellClick += delegate(object s, DataGridViewCellEventArgs e) { SelectFromGrid(_gridErrors, e.RowIndex); };
             _tabErrors.Controls.Add(_gridErrors);
 
             // Tab 4: Estadísticas
@@ -464,6 +467,7 @@ namespace AnalizadorLexico.UI
                     tok.Category.ToString(),
                     tok.Description
                 );
+                _gridTokens.Rows[rowIndex].Tag = tok;
 
                 // Colorear categoría
                 Color catColor = Theme.GetCategoryColor(tok.Category);
@@ -498,6 +502,7 @@ namespace AnalizadorLexico.UI
                     err.Message,
                     err.Suggestion
                 );
+                _gridErrors.Rows[rowIndex].Tag = err;
 
                 _gridErrors.Rows[rowIndex].Cells["Message"].Style.ForeColor = Theme.Danger;
             }
@@ -506,6 +511,9 @@ namespace AnalizadorLexico.UI
             _tabTokens.Text = string.Format("Tokens ({0})", _lexer.Tokens.Count);
             _tabSymbols.Text = string.Format("Tabla de Símbolos ({0})", symbols.Count);
             _tabErrors.Text = string.Format("Errores Léxicos ({0})", _lexer.Errors.Count);
+
+            // Colorear el código del editor según cada token
+            HighlightEditor();
 
             // Generar vista de Estadísticas
             RenderStats();
@@ -525,6 +533,70 @@ namespace AnalizadorLexico.UI
 
             _statsLabel.Text = string.Format("Tokens: {0} | Errores: {1} | Tiempo: {2:0.00} ms",
                 _lexer.Stats.TotalTokens, _lexer.Stats.TotalErrors, _lexer.Stats.ElapsedMilliseconds);
+        }
+
+        // ================= MEJORAS: resaltado en el editor =================
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        private const int WM_SETREDRAW = 0x0B;
+
+        /// <summary>
+        /// Pinta cada token del editor con el color de su categoría y marca los errores en rojo.
+        /// </summary>
+        private void HighlightEditor()
+        {
+            int selStart = _txtEditor.SelectionStart;
+            int selLength = _txtEditor.SelectionLength;
+            int textLength = _txtEditor.TextLength;
+
+            SendMessage(_txtEditor.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero); // evita parpadeo
+
+            _txtEditor.SelectAll();
+            _txtEditor.SelectionColor = Theme.TextPrimary;
+            _txtEditor.SelectionBackColor = Theme.BgInput;
+
+            foreach (Token tok in _lexer.Tokens)
+            {
+                if (tok.Type == TokenType.EndOfFile) continue;
+                if (tok.Position + tok.Length > textLength) continue;
+                _txtEditor.Select(tok.Position, tok.Length);
+                _txtEditor.SelectionColor = Theme.GetCategoryColor(tok.Category);
+            }
+
+            foreach (LexicalError err in _lexer.Errors)
+            {
+                if (err.Position + err.Length > textLength) continue;
+                _txtEditor.Select(err.Position, err.Length);
+                _txtEditor.SelectionColor = Color.White;
+                _txtEditor.SelectionBackColor = Color.FromArgb(190, 40, 40);
+            }
+
+            _txtEditor.Select(selStart, selLength);
+            SendMessage(_txtEditor.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero);
+            _txtEditor.Invalidate();
+        }
+
+        /// <summary>
+        /// Al hacer clic en una fila de Tokens o Errores, selecciona ese lexema en el editor.
+        /// </summary>
+        private void SelectFromGrid(DataGridView grid, int rowIndex)
+        {
+            if (rowIndex < 0) return;
+            object tag = grid.Rows[rowIndex].Tag;
+
+            int position, length;
+            Token tok = tag as Token;
+            LexicalError err = tag as LexicalError;
+            if (tok != null && tok.Type != TokenType.EndOfFile) { position = tok.Position; length = tok.Length; }
+            else if (err != null) { position = err.Position; length = err.Length; }
+            else return;
+
+            if (position + length > _txtEditor.TextLength) return;
+            _txtEditor.Focus();
+            _txtEditor.Select(position, length);
+            _txtEditor.ScrollToCaret();
+            SyncLineNumbers();
         }
 
         private void RenderStats()
