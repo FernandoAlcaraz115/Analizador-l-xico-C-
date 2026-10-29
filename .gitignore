@@ -1,0 +1,15 @@
+# Visual Studio / IDE
+.vs/
+.vscode/
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Sistema Operativo
+desktop.ini
+Desktop.ini
+Thumbs.db
+.DS_Store

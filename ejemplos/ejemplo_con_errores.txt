@@ -1,0 +1,27 @@
+// ==========================================
+// Código con errores léxicos intencionados
+// Para probar la capacidad de detección del Scanner
+// ==========================================
+
+int valorBase = 50;
+
+// Error 1: Número decimal con múltiples puntos
+float numeroInvalido = 12.34.56;
+
+// Error 2: Identificador no válido iniciado por dígitos contiguos
+int 99identificadorInvalido = 100;
+
+// Error 3: Literal de cadena sin comillas de cierre antes del salto de línea
+string mensaje = "Esta es una cadena que nunca fue cerrada;
+
+// Error 4: Literal de carácter con múltiples caracteres o inválido
+char letra = 'demasiado_largo';
+
+// Error 5: Caracteres no reconocidos en el lenguaje (@, #, $, ~)
+int operacionRara = valorBase @ 10 # 5 $ 2;
+
+// Error 6: Operador lógico incompleto ('&' en lugar de '&&' o '|' en lugar de '||')
+bool flag = (valorBase > 10 & valorBase < 100);
+
+// Error 7: Comentario de bloque sin cerrar antes del fin de archivo
+/* Este comentario de bloque quedó abierto y el archivo termina aquí...

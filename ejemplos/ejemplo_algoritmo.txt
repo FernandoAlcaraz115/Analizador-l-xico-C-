@@ -1,0 +1,52 @@
+// ==========================================
+// Algoritmo: Ordenamiento Burbuja y Factorial
+// Demuestra bucles, llamadas y operadores complejos
+// ==========================================
+
+function int factorial(int n)
+{
+    if (n <= 1)
+    {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+function void ordenarArreglo()
+{
+    int n = 5;
+    int i = 0;
+    int j = 0;
+    int temp = 0;
+
+    println("Ejecutando algoritmo de ordenamiento:");
+
+    for (i = 0; i < n; i++)
+    {
+        for (j = 0; j < n - 1; j++)
+        {
+            // Comparación de elementos adyacentes
+            if (i > j)
+            {
+                temp = i;
+                i = j;
+                j = temp;
+            }
+        }
+    }
+
+    println("Ordenamiento completado con exito.");
+}
+
+void main()
+{
+    int num = 6;
+    int resultadoFact = factorial(num);
+
+    print("Factorial de ");
+    print(num);
+    print(" es: ");
+    println(resultadoFact);
+
+    ordenarArreglo();
+}

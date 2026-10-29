@@ -1,0 +1,55 @@
+// ==========================================
+// Programa de prueba para el Analizador Léxico
+// Demostración de sintaxis correcta
+// ==========================================
+
+class SistemaVentas
+{
+    // Variables globales y tipos primitivos
+    int idTransaccion = 1001;
+    float subtotal = 450.75;
+    float tasaImpuesto = 0.16;
+    string cliente = "Carlos Mendez";
+    bool envioGratis = true;
+
+    /* Función para calcular el total
+       incluyendo impuesto y descuento */
+    float calcularTotal(float precio, float tasa, bool aplicarDescuento)
+    {
+        float impuesto = precio * tasa;
+        float total = precio + impuesto;
+
+        if (aplicarDescuento == true && total >= 500.0)
+        {
+            total -= 50.0; // Descuento directo
+        }
+
+        return total;
+    }
+
+    void main()
+    {
+        println("Iniciando procesamiento de venta...");
+        println(cliente);
+
+        int contador = 0;
+        while (contador < 3)
+        {
+            contador++;
+            print("Iteracion: ");
+            println(contador);
+        }
+
+        float totalFinal = calcularTotal(subtotal, tasaImpuesto, envioGratis);
+
+        if (totalFinal > 0.0)
+        {
+            print("Total a pagar: ");
+            println(totalFinal);
+        }
+        else
+        {
+            println("Error en el cálculo");
+        }
+    }
+}
